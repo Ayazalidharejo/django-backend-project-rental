@@ -28,23 +28,9 @@ class Booking(models.Model):
         verbose_name_plural = 'Bookings'
 
     def clean(self):
-        """Validate booking dates"""
         if self.start_date and self.end_date:
             if self.end_date < self.start_date:
                 raise ValidationError("End date must be after start date.")
-            
-            # Check for overlapping bookings for the same vehicle
-            overlapping = Booking.objects.filter(
-                vehicle=self.vehicle,
-                status__in=['pending', 'confirmed'],
-                start_date__lte=self.end_date,
-                end_date__gte=self.start_date
-            ).exclude(pk=self.pk if self.pk else None)
-            
-            if overlapping.exists():
-                raise ValidationError(
-                    "This vehicle is already booked for the selected dates."
-                )
 
     def save(self, *args, **kwargs):
         self.full_clean()

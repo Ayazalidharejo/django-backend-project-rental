@@ -1,28 +1,22 @@
 from django.core.exceptions import ValidationError
-from django.utils import timezone
+from datetime import date
 from .models import Booking
 
 
-def validate_booking_dates(start_date, end_date, vehicle, booking_id=None):
-    """
-    Custom validator to check booking date conflicts.
-    
-    Args:
-        start_date: Start date of the booking
-        end_date: End date of the booking
-        vehicle: Vehicle instance
-        booking_id: Optional booking ID to exclude from conflict check
-    
-    Raises:
-        ValidationError if dates are invalid or conflicts exist
-    """
+def validate_future_date(value):
+    if value < date.today():
+        raise ValidationError("Date cannot be in the past.")
+
+
+def validate_booking_dates(start_date, end_date):
     if end_date < start_date:
         raise ValidationError("End date must be after start date.")
     
-    if start_date < timezone.now().date():
+    if start_date < date.today():
         raise ValidationError("Start date cannot be in the past.")
-    
-    # Check for overlapping bookings
+
+
+def validate_no_overlap(vehicle, start_date, end_date, exclude_booking=None):
     overlapping = Booking.objects.filter(
         vehicle=vehicle,
         status__in=['pending', 'confirmed'],
@@ -30,12 +24,11 @@ def validate_booking_dates(start_date, end_date, vehicle, booking_id=None):
         end_date__gte=start_date
     )
     
-    if booking_id:
-        overlapping = overlapping.exclude(pk=booking_id)
+    if exclude_booking:
+        overlapping = overlapping.exclude(pk=exclude_booking.pk)
     
     if overlapping.exists():
         raise ValidationError(
-            "This vehicle is already booked for the selected dates. "
-            f"Please choose different dates or another vehicle."
+            "This vehicle is already booked for the selected dates."
         )
 

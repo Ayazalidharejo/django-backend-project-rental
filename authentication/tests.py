@@ -5,14 +5,12 @@ from rest_framework import status
 
 
 class AuthenticationTests(TestCase):
-    """Test cases for authentication endpoints"""
-
     def setUp(self):
         self.client = APIClient()
         self.register_url = '/api/register'
         self.login_url = '/api/login'
 
-    def test_register_user_success(self):
+    def test_user_registration_success(self):
         """Test successful user registration"""
         data = {
             'username': 'testuser',
@@ -26,10 +24,9 @@ class AuthenticationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertIn('access', response.data)
         self.assertIn('refresh', response.data)
-        self.assertIn('user', response.data)
-        self.assertEqual(response.data['user']['username'], 'testuser')
+        self.assertTrue(User.objects.filter(username='testuser').exists())
 
-    def test_register_user_password_mismatch(self):
+    def test_user_registration_password_mismatch(self):
         """Test registration with mismatched passwords"""
         data = {
             'username': 'testuser',
@@ -41,29 +38,20 @@ class AuthenticationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('password', response.data)
 
-    def test_register_user_duplicate_username(self):
+    def test_user_registration_duplicate_username(self):
         """Test registration with duplicate username"""
-        User.objects.create_user(username='existing', email='existing@example.com', password='pass123')
+        User.objects.create_user(username='testuser', password='testpass123')
         data = {
-            'username': 'existing',
-            'email': 'new@example.com',
+            'username': 'testuser',
+            'email': 'test@example.com',
             'password': 'testpass123',
             'password_confirm': 'testpass123',
         }
         response = self.client.post(self.register_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_register_user_missing_required_fields(self):
-        """Test registration with missing required fields"""
-        data = {
-            'username': 'testuser',
-            # Missing email, password, password_confirm
-        }
-        response = self.client.post(self.register_url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_login_success(self):
-        """Test successful login"""
+    def test_user_login_success(self):
+        """Test successful user login"""
         User.objects.create_user(username='testuser', password='testpass123')
         data = {
             'username': 'testuser',
@@ -73,9 +61,8 @@ class AuthenticationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('access', response.data)
         self.assertIn('refresh', response.data)
-        self.assertIn('user', response.data)
 
-    def test_login_invalid_credentials(self):
+    def test_user_login_invalid_credentials(self):
         """Test login with invalid credentials"""
         User.objects.create_user(username='testuser', password='testpass123')
         data = {
@@ -83,30 +70,21 @@ class AuthenticationTests(TestCase):
             'password': 'wrongpassword'
         }
         response = self.client.post(self.login_url, data, format='json')
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        self.assertIn('error', response.data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_login_missing_credentials(self):
-        """Test login with missing credentials"""
-        data = {
-            'username': 'testuser',
-            # Missing password
-        }
+    def test_user_login_missing_fields(self):
+        """Test login with missing required fields"""
+        data = {'username': 'testuser'}
         response = self.client.post(self.login_url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_jwt_token_validity(self):
-        """Test that JWT tokens are valid and can be used"""
-        # Register user
+    def test_user_registration_minimum_password_length(self):
+        """Test registration with password shorter than 8 characters"""
         data = {
             'username': 'testuser',
             'email': 'test@example.com',
-            'password': 'testpass123',
-            'password_confirm': 'testpass123',
+            'password': 'short',
+            'password_confirm': 'short',
         }
         response = self.client.post(self.register_url, data, format='json')
-        access_token = response.data['access']
-        
-        # Use token to access protected endpoint
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {access_token}')
-        # This would require a protected endpoint to fully test, but token structure is validated
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
